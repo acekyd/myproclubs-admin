@@ -1,0 +1,98 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+@theme static {
+  --font-sans: "Syne", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-ops-50: #fff5f3;
+  --color-ops-100: #ffe8e3;
+  --color-ops-200: #ffcfc5;
+  --color-ops-300: #ffab9a;
+  --color-ops-400: #ff7a5c;
+  --color-ops-500: #f04d2a;
+  --color-ops-600: #d63312;
+  --color-ops-700: #b2280f;
+  --color-ops-800: #942414;
+  --color-ops-900: #7a2316;
+  --color-ops-950: #420e08;
+
+  --color-graphite-50: #f4f5f6;
+  --color-graphite-100: #e4e6e9;
+  --color-graphite-200: #c9ced4;
+  --color-graphite-300: #a3abb5;
+  --color-graphite-400: #778290;
+  --color-graphite-500: #5c6775;
+  --color-graphite-600: #4a5260;
+  --color-graphite-700: #3d4450;
+  --color-graphite-800: #353a44;
+  --color-graphite-900: #1c1f26;
+  --color-graphite-950: #0f1115;
+}
+
+html,
+body,
+#__nuxt {
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(240, 77, 42, 0.12), transparent 50%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(119, 130, 144, 0.08), transparent 45%),
+    linear-gradient(180deg, #0f1115 0%, #151821 100%);
+  color: #e4e6e9;
+  font-family: var(--font-sans);
+}
+
+.ops-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.ops-noise {
+  position: relative;
+}
+
+.ops-noise::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+@keyframes ops-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ops-enter {
+  animation: ops-fade-up 0.45s ease-out both;
+}
+
+.ops-enter-delay-1 {
+  animation-delay: 0.06s;
+}
+
+.ops-enter-delay-2 {
+  animation-delay: 0.12s;
+}
+
+.ops-enter-delay-3 {
+  animation-delay: 0.18s;
+}
