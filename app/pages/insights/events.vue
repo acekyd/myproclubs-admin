@@ -14,7 +14,7 @@ const { adminFetch } = useAdminApi()
 const { status, loadStatus } = useAnalyticsStatus()
 const filters = reactive({
   environment: String(route.query.environment || ''),
-  days: [1, 7, 30, 90].includes(Number(route.query.days))
+  days: [1, 7, 30, 90, 365].includes(Number(route.query.days))
     ? Number(route.query.days)
     : 7,
   source: 'all',
@@ -168,7 +168,8 @@ onBeforeUnmount(() => {
             { label: 'Last 24 hours', value: 1 },
             { label: 'Last 7 days', value: 7 },
             { label: 'Last 30 days', value: 30 },
-            { label: 'Last 90 days', value: 90 }
+            { label: 'Last 90 days', value: 90 },
+            { label: 'Last 365 days', value: 365 }
           ]"
           class="w-full"
         />
