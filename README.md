@@ -1,35 +1,18 @@
-# ProClubs Control Room
+# MyProClubs Admin
 
-Private operator console for MyProClubs. The app is a Nuxt frontend for the
-protected Laravel API under `/api/v1/admin/*`. It manages product data, support
-operations, audit history, and first-party product analytics. Filament remains
-available for workflows that have not moved into Control Room.
+Private administration console for MyProClubs. This Nuxt application consumes
+the protected Laravel API under `/api/v1/admin/*` and provides tools for managing
+users, clubs, competitions, content, support operations, audit history, and
+first-party product analytics.
 
-## What is included
+## Requirements
 
-- Dashboard and operational counts
-- Users and clubs
-- Announcements, media, and recruitment posts
-- Tournaments, seasons, fixtures, records, and player statistics
-- Support operations and operator audit logs
-- Product events, tournament funnels, and timestamped user journeys
-
-The analytics screens can follow a journey by account, browser session,
-anonymous visitor, or tournament creation attempt. Verified account activity and
-anonymous session context are labelled separately; sessions shared by multiple
-accounts are not attributed automatically.
-
-## Stack
-
-- Nuxt 4 and Vue 3
-- Nuxt UI 4
-- Pinia
-- TypeScript
+- Node.js 22
 - pnpm 10
+- MyProClubs Laravel API
+- A verified account included in the backend `ADMIN_EMAILS` allowlist
 
-Use Node 22 locally and in deployment.
-
-## Local setup
+## Getting started
 
 ```sh
 cp .env.example .env
@@ -37,18 +20,21 @@ pnpm install
 pnpm dev
 ```
 
-Set the API base in `.env`:
+The development server is available at `http://localhost:3000` by default.
+
+## Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `NUXT_PUBLIC_API_BASE` | Yes | Laravel API base URL, including `/api/v1/` |
+
+Example:
 
 ```dotenv
 NUXT_PUBLIC_API_BASE=http://localhost:8000/api/v1/
 ```
 
-The development server opens at `http://localhost:3000` by default. The API base
-may include or omit the trailing slash; the client normalizes it.
-
-## Backend configuration
-
-The Laravel backend controls access and must know the admin origin:
+The Laravel API must also include the admin origin in its configuration:
 
 ```dotenv
 ADMIN_EMAILS=operator@myproclubs.com
@@ -56,62 +42,53 @@ ADMIN_FRONTEND_URL=http://localhost:3000
 CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
-`ADMIN_EMAILS` is a comma-separated allowlist. An operator must have a verified
-MyProClubs account whose email is on that list. `CORS_ALLOWED_ORIGINS` should list
-the customer and admin origins in production.
+## Available commands
 
-## Authentication and authorization
+| Command | Description |
+| --- | --- |
+| `pnpm dev` | Start the development server |
+| `pnpm build` | Create a production build |
+| `pnpm preview` | Run the production build locally |
+| `pnpm lint` | Run ESLint |
+| `pnpm typecheck` | Run Nuxt and Vue TypeScript checks |
 
-1. The login page calls `POST /api/v1/login`.
-2. The returned user must have `is_platform_admin=true`.
-3. The app verifies the session through `GET /api/v1/admin/me`.
-4. Every admin API route independently requires Sanctum authentication and the
-   backend platform-admin guard.
+## Application areas
 
-The browser stores the Sanctum token in the `mpc_admin_token` cookie for up to
-three days. A 401 or 403 clears the local session and returns the operator to the
-login screen. The UI check is for navigation; backend authorization remains the
-security boundary.
+- Dashboard and operational summaries
+- Users and clubs
+- Announcements, media, and recruitment
+- Tournaments, seasons, fixtures, records, and player statistics
+- Support operations and operator audit logs
+- Product events, tournament funnels, and user journeys
+
+Some tournament administration workflows remain available through the Laravel
+Filament panel.
+
+## Authentication
+
+The application authenticates through the main MyProClubs login endpoint and
+verifies access with `/api/v1/admin/me`. All admin API routes require a valid
+Sanctum token and backend platform-admin authorization.
+
+The frontend permission check is used for navigation only. The Laravel API is the
+authorization boundary and must reject every unauthorized admin request.
 
 ## Product analytics
 
-Control Room reads first-party events owned by MyProClubs. It does not require
-PostHog or another analytics account.
+The Insights section reads first-party analytics from the Laravel API:
 
-- **Journeys** shows chronological page visits, clicks, form actions, API results,
-  tournament steps, timestamps, and correlation identifiers.
-- **Events** provides environment, period, source, account, session, tournament,
-  event-name, search, and failure filters.
-- **Funnels** reports tournament creation, EA creation, and join conversion.
+- **Journeys** displays timestamped activity by user, session, anonymous visitor,
+  or tournament flow.
+- **Events** provides searchable and filterable product events.
+- **Funnels** reports tournament creation and joining conversion.
 
-The selectors support up to 365 days, matching the default backend retention.
-The admin app only reads analytics; event collection happens in the customer UI
-and Laravel backend. Product telemetry is separate from operator audit history.
+Analytics collection happens in the customer application and backend. This admin
+application does not collect customer events and requires no analytics provider
+credentials.
 
-If an Insights page reports that analytics is unavailable, verify that the
-backend migrations ran against the analytics database, the analytics queue worker
-is running, and collection is enabled. Events that occurred before collection was
-enabled cannot be reconstructed.
+## Production deployment
 
-## Commands
-
-```sh
-pnpm dev        # local development
-pnpm lint       # ESLint
-pnpm typecheck  # Nuxt/Vue TypeScript checks
-pnpm build      # production build
-pnpm preview    # run the built app locally
-```
-
-## Deployment
-
-Set the production API URL before building:
-
-```dotenv
-NUXT_PUBLIC_API_BASE=https://api.example.com/api/v1/
-```
-
-Then install and build with the lockfile:
+Set the production API URL, then install, validate, and build from the lockfile:
 
 ```sh
 pnpm install --frozen-lockfile
@@ -120,34 +97,37 @@ pnpm typecheck
 pnpm build
 ```
 
-Run the generated Nuxt server using the hosting platform's normal Node process.
-Keep the application private, set `robots` to no-index as configured, and restrict
-the backend CORS allowlist to known customer and admin origins.
+Run the generated Nuxt server with the hosting platform's Node process manager.
+The production environment should use HTTPS and a restricted backend CORS
+allowlist containing the exact admin origin.
 
-## Production smoke test
+Before releasing, verify:
 
-- [ ] A non-allowlisted account can sign in to MyProClubs but receives 403 from
-      `/api/v1/admin/me` and cannot enter Control Room.
-- [ ] A verified allowlisted operator can sign in and load dashboard counts.
-- [ ] User, club, tournament, and match-data lists load from the production API.
-- [ ] A support action updates its subject and creates an audit entry.
-- [ ] Edits made in Control Room are visible in Filament, and vice versa.
-- [ ] Journeys, Events, and Funnels show the backend environment and retention.
-- [ ] A recent customer action appears in Events and its correlated journey.
-- [ ] Direct navigation and page refresh work for nested routes.
+- An allowlisted, verified operator can sign in.
+- A regular user receives `403` from `/api/v1/admin/me`.
+- Dashboard, entity lists, support actions, and audit logs load correctly.
+- Events, Journeys, and Funnels can read the analytics API.
+- Direct navigation and refresh work for nested routes.
 
-## Troubleshooting
+## Project structure
 
-If login succeeds and the app immediately returns to `/login`, check the operator
-allowlist, email verification, API base URL, CORS origins, and `/admin/me`
-response. Browser content blockers may block URLs containing `analytics`; the app
-uses `/insights/*` routes to avoid that class of false positive.
+```text
+app/
+├── components/      Shared admin UI
+├── composables/     API and analytics clients
+├── layouts/         Authenticated console layout
+├── middleware/      Operator route protection
+├── pages/           Route-based admin screens
+├── stores/          Authentication state
+└── utils/           Navigation and shared utilities
+```
 
-For server errors, inspect the Laravel logs and confirm the relevant migrations
-have run. Control Room intentionally shows a short operational error instead of
-SQL statements or stack traces.
+## Security
 
-## Work still handled in Filament
-
-Tournament rounds, standings, prizes, invitations, club requests, admin
-invitations, and deep tournament match player-stat editing remain in Filament.
+- Keep the application private and retain the configured `noindex, nofollow`
+  metadata.
+- Never expose backend credentials through `NUXT_PUBLIC_*` variables.
+- Keep `ADMIN_EMAILS` and all authorization checks on the Laravel backend.
+- Review operator actions through the audit log.
+- Do not display SQL statements, stack traces, credentials, or private event data
+  in the browser.
