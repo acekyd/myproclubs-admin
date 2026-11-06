@@ -56,7 +56,7 @@ async function load() {
       }).filter(([, value]) => value !== '' && value !== undefined)
     )
     const response = await adminFetch<AnalyticsPage<ProductEvent>>(
-      'admin/analytics/events',
+      'admin/product-events',
       { query, signal: controller.signal }
     )
     if (current === revision) result.value = response.data
