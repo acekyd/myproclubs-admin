@@ -100,9 +100,6 @@ async function logout() {
             <p class="font-mono text-[10px] uppercase tracking-[0.2em] text-graphite-500">
               Operator console
             </p>
-            <p class="truncate text-sm text-graphite-200">
-              Privileged actions are audited.
-            </p>
           </div>
         </header>
 

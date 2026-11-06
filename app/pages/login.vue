@@ -76,7 +76,7 @@ async function submit() {
         Control Room
       </h1>
       <p class="mt-2 text-sm text-graphite-400">
-        Operator sign-in. Access is allowlist-gated and audited.
+        Sign in to access the control room.
       </p>
 
       <form class="mt-8 space-y-4" action="#" method="post" @submit.prevent.stop="submit">
