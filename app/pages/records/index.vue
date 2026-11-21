@@ -2,6 +2,8 @@
 definePageMeta({ layout: 'admin', middleware: ['admin-auth'] })
 type Row = {
   id: number
+  tournament_id?: number
+  tournament_name?: string | null
   home_team: string
   away_team: string
   home_score: number | null
@@ -13,6 +15,11 @@ onMounted(() => load())
 watch(page, () => load())
 let t: ReturnType<typeof setTimeout> | undefined
 watch(q, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; load() }, 300) })
+
+const rows = computed(() => (result.value?.data || []).map(row => ({
+  ...row,
+  tournament_name: row.tournament_name || (row.tournament_id ? `#${row.tournament_id}` : '—'),
+})))
 </script>
 
 <template>
@@ -25,13 +32,14 @@ watch(q, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; load() 
       v-model:search="q"
       :columns="[
         { key: 'id', label: 'ID', mono: true },
+        { key: 'tournament_name', label: 'Tournament' },
         { key: 'home_team', label: 'Home' },
         { key: 'away_team', label: 'Away' },
         { key: 'home_score', label: 'HS', mono: true },
         { key: 'away_score', label: 'AS', mono: true },
         { key: 'match_date', label: 'Date', mono: true },
       ]"
-      :rows="(result?.data || []) as any"
+      :rows="rows as any"
       :loading="loading"
       :error="error"
       :page="result?.current_page"

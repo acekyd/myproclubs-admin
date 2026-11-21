@@ -3,6 +3,7 @@ definePageMeta({ layout: 'admin', middleware: ['admin-auth'] })
 type Row = {
   id: number
   tournament_id: number
+  tournament_name?: string | null
   round: string | null
   status: string | null
   home_score: number | null
@@ -18,6 +19,7 @@ watch(q, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; load() 
 
 const rows = computed(() => (result.value?.data || []).map(row => ({
   ...row,
+  tournament_name: row.tournament_name || `#${row.tournament_id}`,
   matchup: `${row.home_team || 'TBD'} vs ${row.away_team || 'TBD'}`
 })))
 </script>
@@ -32,7 +34,7 @@ const rows = computed(() => (result.value?.data || []).map(row => ({
       v-model:search="q"
       :columns="[
         { key: 'id', label: 'ID', mono: true },
-        { key: 'tournament_id', label: 'Tournament', mono: true },
+        { key: 'tournament_name', label: 'Tournament' },
         { key: 'matchup', label: 'Match' },
         { key: 'round', label: 'Round' },
         { key: 'status', label: 'Status' },

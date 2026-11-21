@@ -25,6 +25,8 @@ type ScheduledMail = {
   tournament?: { id: number, name: string, slug?: string } | null
 }
 
+import { apiErrorMessage, safeTrim } from '~/utils/admin-api'
+
 const route = useRoute()
 const { adminFetch } = useAdminApi()
 const toast = useToast()
@@ -39,19 +41,28 @@ const replyToName = ref('')
 const sendAt = ref('')
 const selectedRecipientIds = ref<number[]>([])
 const cancelReason = ref('')
+const loadError = ref<string | null>(null)
 
 const isPending = computed(() => mail.value?.status === 'pending')
+const canSaveChanges = computed(() => (
+  isPending.value
+  && safeTrim(subject.value) !== ''
+  && safeTrim(body.value) !== ''
+  && selectedRecipientIds.value.length > 0
+))
 
 onMounted(async () => {
   try {
     const res = await adminFetch<{ scheduled_mail: ScheduledMail }>(`admin/scheduled-mails/${route.params.id}`)
     mail.value = res.data.scheduled_mail
-    subject.value = mail.value.subject
-    body.value = mail.value.body
-    replyToEmail.value = mail.value.reply_to_email || ''
-    replyToName.value = mail.value.reply_to_name || ''
-    sendAt.value = mail.value.send_at ? String(mail.value.send_at).slice(0, 16) : ''
-    selectedRecipientIds.value = (mail.value.recipients || []).map(r => r.user_id)
+    subject.value = String(mail.value?.subject ?? '')
+    body.value = String(mail.value?.body ?? '')
+    replyToEmail.value = String(mail.value?.reply_to_email ?? '')
+    replyToName.value = String(mail.value?.reply_to_name ?? '')
+    sendAt.value = mail.value?.send_at ? String(mail.value.send_at).slice(0, 16) : ''
+    selectedRecipientIds.value = (mail.value?.recipients || []).map(r => r.user_id)
+  } catch (e: unknown) {
+    loadError.value = apiErrorMessage(e, 'Failed to load scheduled mail')
   } finally {
     loading.value = false
   }
@@ -72,18 +83,18 @@ async function save() {
     const res = await adminFetch<{ scheduled_mail: ScheduledMail }>(`admin/scheduled-mails/${route.params.id}`, {
       method: 'PUT',
       body: {
-        subject: subject.value,
-        body: body.value,
+        subject: safeTrim(subject.value),
+        body: safeTrim(body.value),
         recipient_user_ids: selectedRecipientIds.value,
-        reply_to_email: replyToEmail.value || null,
-        reply_to_name: replyToName.value || null,
+        reply_to_email: safeTrim(replyToEmail.value) || null,
+        reply_to_name: safeTrim(replyToName.value) || null,
         send_at: sendAt.value || null
       }
     })
     mail.value = res.data.scheduled_mail
     toast.add({ title: 'Scheduled mail updated', color: 'success' })
   } catch (e: unknown) {
-    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Update failed', color: 'error' })
+    toast.add({ title: apiErrorMessage(e, 'Update failed'), color: 'error' })
   } finally {
     saving.value = false
   }
@@ -100,7 +111,7 @@ async function cancelMail() {
     mail.value = res.data.scheduled_mail
     toast.add({ title: 'Scheduled mail cancelled', color: 'success' })
   } catch (e: unknown) {
-    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Cancel failed', color: 'error' })
+    toast.add({ title: apiErrorMessage(e, 'Cancel failed'), color: 'error' })
   } finally {
     cancelling.value = false
   }
@@ -131,6 +142,12 @@ async function cancelMail() {
       v-if="loading"
       :fields="6"
     />
+    <div
+      v-else-if="loadError"
+      class="rounded-xl border border-ops-500/20 bg-ops-500/10 px-4 py-3 text-sm text-ops-300"
+    >
+      {{ loadError }}
+    </div>
     <div
       v-else-if="mail"
       class="grid max-w-3xl gap-6"
@@ -221,7 +238,7 @@ async function cancelMail() {
             color="primary"
             label="Save changes"
             :loading="saving"
-            :disabled="!subject.trim() || !body.trim() || !selectedRecipientIds.length"
+            :disabled="!canSaveChanges"
             @click="save"
           />
         </div>

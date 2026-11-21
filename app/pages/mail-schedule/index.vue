@@ -23,7 +23,16 @@ const result = ref<{
   last_page: number
   total: number
 } | null>(null)
+import { apiErrorMessage } from '~/utils/admin-api'
+
 const { adminFetch } = useAdminApi()
+
+const emptyPage = () => ({
+  data: [] as ScheduledMail[],
+  current_page: 1,
+  last_page: 1,
+  total: 0,
+})
 
 async function load() {
   loading.value = true
@@ -35,9 +44,12 @@ async function load() {
       last_page: number
       total: number
     }>(`admin/scheduled-mails?status=${encodeURIComponent(status.value)}&page=${page.value}&per_page=25`)
-    result.value = res.data
+    result.value = res.data ?? emptyPage()
   } catch (e: unknown) {
-    error.value = (e as { data?: { message?: string } })?.data?.message || 'Failed to load scheduled mail'
+    error.value = apiErrorMessage(e, 'Failed to load scheduled mail')
+    if (!result.value) {
+      result.value = emptyPage()
+    }
   } finally {
     loading.value = false
   }

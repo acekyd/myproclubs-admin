@@ -1,3 +1,5 @@
+import { apiErrorMessage, safeTrim } from '~/utils/admin-api'
+
 export type Paginated<T> = {
   data: T[]
   current_page: number
@@ -27,13 +29,14 @@ export function useAdminList<T>(endpoint: string) {
           Object.entries(extra).filter(([, v]) => v !== undefined && v !== ''),
         ) as Record<string, string | number | boolean>,
       }
-      if (q.value.trim()) {
-        query.q = q.value.trim()
+      const search = safeTrim(q.value)
+      if (search) {
+        query.q = search
       }
       const res = await adminFetch<Paginated<T>>(endpoint, { query })
       result.value = res.data
     } catch (e: unknown) {
-      error.value = (e as { data?: { message?: string } })?.data?.message || 'Failed to load'
+      error.value = apiErrorMessage(e, 'Failed to load')
       // Keep prior rows on refresh failure; clear on first load.
       if (!result.value) {
         result.value = null

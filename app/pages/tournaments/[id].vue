@@ -29,6 +29,8 @@ type ReplyToOption = {
   role: string
 }
 
+import { apiErrorMessage, safeTrim } from '~/utils/admin-api'
+
 const route = useRoute()
 const { adminFetch } = useAdminApi()
 const toast = useToast()
@@ -53,6 +55,12 @@ const messageBody = ref('')
 const replyToEmail = ref('')
 const replyToName = ref('')
 const delayMinutes = ref(30)
+
+const canScheduleMessage = computed(() => (
+  safeTrim(messageSubject.value) !== ''
+  && safeTrim(messageBody.value) !== ''
+  && selectedRecipientIds.value.length > 0
+))
 
 const form = reactive({
   owner_id: '' as string | number,
@@ -134,7 +142,7 @@ async function save() {
       toast.add({ title: 'Tournament updated', color: 'success' })
     }
   } catch (e: unknown) {
-    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Save failed', color: 'error' })
+    toast.add({ title: apiErrorMessage(e, 'Save failed'), color: 'error' })
   } finally {
     saving.value = false
   }
@@ -144,8 +152,8 @@ function applyTemplate(key: string) {
   const tpl = templates.value.find(t => t.key === key)
   if (!tpl) return
   selectedTemplate.value = key
-  messageSubject.value = tpl.subject
-  messageBody.value = tpl.body
+  messageSubject.value = String(tpl.subject ?? '')
+  messageBody.value = String(tpl.body ?? '')
 }
 
 function toggleRecipient(id: number, checked: boolean) {
@@ -157,6 +165,14 @@ function toggleRecipient(id: number, checked: boolean) {
 }
 
 async function openMessageModal() {
+  messageSubject.value = ''
+  messageBody.value = ''
+  replyToEmail.value = ''
+  replyToName.value = ''
+  templates.value = []
+  messageRecipients.value = []
+  replyToOptions.value = []
+  selectedRecipientIds.value = []
   messageOpen.value = true
   messageLoading.value = true
   try {
@@ -172,11 +188,11 @@ async function openMessageModal() {
     delayMinutes.value = res.data.delay_minutes || 30
     selectedRecipientIds.value = messageRecipients.value.map(r => r.user_id)
     const defaultReply = replyToOptions.value[0]
-    replyToEmail.value = defaultReply?.email || ''
-    replyToName.value = defaultReply?.name || ''
+    replyToEmail.value = String(defaultReply?.email ?? '')
+    replyToName.value = String(defaultReply?.name ?? '')
     if (templates.value.length) applyTemplate(templates.value[0].key)
   } catch (e: unknown) {
-    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Could not load templates', color: 'error' })
+    toast.add({ title: apiErrorMessage(e, 'Could not load templates'), color: 'error' })
     messageOpen.value = false
   } finally {
     messageLoading.value = false
@@ -188,7 +204,7 @@ watch(selectedTemplate, (key) => {
 })
 
 async function sendMessage() {
-  if (!messageSubject.value.trim() || !messageBody.value.trim()) {
+  if (!canScheduleMessage.value) {
     toast.add({ title: 'Subject and message body are required', color: 'error' })
     return
   }
@@ -202,11 +218,11 @@ async function sendMessage() {
       method: 'POST',
       body: {
         template: selectedTemplate.value,
-        subject: messageSubject.value,
-        body: messageBody.value,
+        subject: safeTrim(messageSubject.value),
+        body: safeTrim(messageBody.value),
         recipient_user_ids: selectedRecipientIds.value,
-        reply_to_email: replyToEmail.value || null,
-        reply_to_name: replyToName.value || null
+        reply_to_email: safeTrim(replyToEmail.value) || null,
+        reply_to_name: safeTrim(replyToName.value) || null
       }
     })
     toast.add({
@@ -216,7 +232,7 @@ async function sendMessage() {
     })
     messageOpen.value = false
   } catch (e: unknown) {
-    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Schedule failed', color: 'error' })
+    toast.add({ title: apiErrorMessage(e, 'Schedule failed'), color: 'error' })
   } finally {
     messageSending.value = false
   }
@@ -616,7 +632,7 @@ async function sendMessage() {
                 icon="i-lucide-clock"
                 label="Schedule send"
                 :loading="messageSending"
-                :disabled="!messageSubject.trim() || !messageBody.trim() || !selectedRecipientIds.length"
+                :disabled="!canScheduleMessage"
                 @click="sendMessage"
               />
             </div>
