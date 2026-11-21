@@ -1,6 +1,14 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: ['admin-auth'] })
-type Row = { id: number, fixture_id: number, player_id: number, goals: number | null, assists: number | null, rating: number | null }
+type Row = {
+  id: number
+  fixture_id: number
+  player_id: number
+  player_name?: string
+  goals: number | null
+  assists: number | null
+  rating: number | null
+}
 const { page, loading, error, result, load } = useAdminList<Row>('admin/player-stats')
 onMounted(() => load())
 watch(page, () => load())
@@ -8,12 +16,15 @@ watch(page, () => load())
 
 <template>
   <div>
-    <AdminPageHeader title="Player stats" description="Per-fixture player statistics." />
+    <AdminPageHeader
+      title="Player stats"
+      description="Per-match tournament player statistics."
+    />
     <AdminDataTable
       :columns="[
         { key: 'id', label: 'ID', mono: true },
-        { key: 'fixture_id', label: 'Fixture', mono: true },
-        { key: 'player_id', label: 'Player', mono: true },
+        { key: 'fixture_id', label: 'Match', mono: true },
+        { key: 'player_name', label: 'Player' },
         { key: 'goals', label: 'G' },
         { key: 'assists', label: 'A' },
         { key: 'rating', label: 'Rating' },

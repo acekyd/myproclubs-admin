@@ -1,6 +1,13 @@
 <script setup lang="ts">
 definePageMeta({ layout: 'admin', middleware: ['admin-auth'] })
-type Row = { id: number, home_team: string, away_team: string, home_score: number | null, away_score: number | null, match_date: string | null }
+type Row = {
+  id: number
+  home_team: string
+  away_team: string
+  home_score: number | null
+  away_score: number | null
+  match_date: string | null
+}
 const { q, page, loading, error, result, load } = useAdminList<Row>('admin/records')
 onMounted(() => load())
 watch(page, () => load())
@@ -10,7 +17,10 @@ watch(q, () => { clearTimeout(t); t = setTimeout(() => { page.value = 1; load() 
 
 <template>
   <div>
-    <AdminPageHeader title="Records" description="Match result records." />
+    <AdminPageHeader
+      title="Records"
+      description="Played tournament match results."
+    />
     <AdminDataTable
       v-model:search="q"
       :columns="[
