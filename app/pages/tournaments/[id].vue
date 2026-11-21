@@ -13,7 +13,20 @@ type MessageTemplate = {
   key: string
   label: string
   subject: string
-  preview: string
+  body: string
+}
+
+type MessageRecipient = {
+  user_id: number
+  name: string
+  email: string
+  role: string
+}
+
+type ReplyToOption = {
+  email: string
+  name: string
+  role: string
 }
 
 const route = useRoute()
@@ -29,10 +42,17 @@ const admins = ref<Person[]>([])
 const messageOpen = ref(false)
 const messageLoading = ref(false)
 const messageSending = ref(false)
+const confirmSaveOpen = ref(false)
 const templates = ref<MessageTemplate[]>([])
+const messageRecipients = ref<MessageRecipient[]>([])
+const replyToOptions = ref<ReplyToOption[]>([])
+const selectedRecipientIds = ref<number[]>([])
 const selectedTemplate = ref('empty_no_teams')
-const customSubject = ref('')
-const customBody = ref('')
+const messageSubject = ref('')
+const messageBody = ref('')
+const replyToEmail = ref('')
+const replyToName = ref('')
+const delayMinutes = ref(30)
 
 const form = reactive({
   owner_id: '' as string | number,
@@ -80,7 +100,16 @@ onMounted(async () => {
   }
 })
 
+function requestSave() {
+  if (isNew.value) {
+    void save()
+    return
+  }
+  confirmSaveOpen.value = true
+}
+
 async function save() {
+  confirmSaveOpen.value = false
   saving.value = true
   try {
     const body: Record<string, unknown> = {
@@ -111,16 +140,41 @@ async function save() {
   }
 }
 
+function applyTemplate(key: string) {
+  const tpl = templates.value.find(t => t.key === key)
+  if (!tpl) return
+  selectedTemplate.value = key
+  messageSubject.value = tpl.subject
+  messageBody.value = tpl.body
+}
+
+function toggleRecipient(id: number, checked: boolean) {
+  if (checked) {
+    if (!selectedRecipientIds.value.includes(id)) selectedRecipientIds.value = [...selectedRecipientIds.value, id]
+  } else {
+    selectedRecipientIds.value = selectedRecipientIds.value.filter(x => x !== id)
+  }
+}
+
 async function openMessageModal() {
   messageOpen.value = true
   messageLoading.value = true
   try {
-    const res = await adminFetch<{ templates: MessageTemplate[] }>(`admin/tournaments/${route.params.id}/message-templates`)
+    const res = await adminFetch<{
+      templates: MessageTemplate[]
+      recipients: MessageRecipient[]
+      reply_to_options: ReplyToOption[]
+      delay_minutes: number
+    }>(`admin/tournaments/${route.params.id}/message-templates`)
     templates.value = res.data.templates || []
-    if (templates.value.length) {
-      selectedTemplate.value = templates.value[0].key
-      customSubject.value = templates.value.find(t => t.key === 'custom')?.subject || ''
-    }
+    messageRecipients.value = res.data.recipients || []
+    replyToOptions.value = res.data.reply_to_options || []
+    delayMinutes.value = res.data.delay_minutes || 30
+    selectedRecipientIds.value = messageRecipients.value.map(r => r.user_id)
+    const defaultReply = replyToOptions.value[0]
+    replyToEmail.value = defaultReply?.email || ''
+    replyToName.value = defaultReply?.name || ''
+    if (templates.value.length) applyTemplate(templates.value[0].key)
   } catch (e: unknown) {
     toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Could not load templates', color: 'error' })
     messageOpen.value = false
@@ -129,26 +183,40 @@ async function openMessageModal() {
   }
 }
 
-const activeTemplate = computed(() => templates.value.find(t => t.key === selectedTemplate.value))
-const isCustom = computed(() => selectedTemplate.value === 'custom')
+watch(selectedTemplate, (key) => {
+  if (!messageLoading.value) applyTemplate(key)
+})
 
 async function sendMessage() {
+  if (!messageSubject.value.trim() || !messageBody.value.trim()) {
+    toast.add({ title: 'Subject and message body are required', color: 'error' })
+    return
+  }
+  if (!selectedRecipientIds.value.length) {
+    toast.add({ title: 'Select at least one recipient', color: 'error' })
+    return
+  }
   messageSending.value = true
   try {
-    const body: Record<string, unknown> = { template: selectedTemplate.value }
-    if (isCustom.value) {
-      body.subject = customSubject.value
-      body.body = customBody.value
-    }
-    const res = await adminFetch<{ sent: number }>(`admin/tournaments/${route.params.id}/messages`, {
+    const res = await adminFetch<{ delay_minutes: number, send_at: string }>(`admin/tournaments/${route.params.id}/messages`, {
       method: 'POST',
-      body
+      body: {
+        template: selectedTemplate.value,
+        subject: messageSubject.value,
+        body: messageBody.value,
+        recipient_user_ids: selectedRecipientIds.value,
+        reply_to_email: replyToEmail.value || null,
+        reply_to_name: replyToName.value || null
+      }
     })
-    toast.add({ title: `Queued ${res.data.sent} message(s)`, color: 'success' })
+    toast.add({
+      title: `Scheduled for ${res.data.delay_minutes || delayMinutes.value} minutes`,
+      description: 'Cancel or edit from Mail schedule before it sends.',
+      color: 'success'
+    })
     messageOpen.value = false
-    customBody.value = ''
   } catch (e: unknown) {
-    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Send failed', color: 'error' })
+    toast.add({ title: (e as { data?: { message?: string } })?.data?.message || 'Schedule failed', color: 'error' })
   } finally {
     messageSending.value = false
   }
@@ -186,7 +254,7 @@ async function sendMessage() {
     >
       <form
         class="space-y-4 rounded-xl border border-white/10 bg-graphite-900/70 p-6"
-        @submit.prevent="save"
+        @submit.prevent="requestSave"
       >
         <div class="flex items-center justify-between gap-3">
           <p class="font-mono text-[10px] uppercase tracking-widest text-graphite-500">
@@ -380,18 +448,51 @@ async function sendMessage() {
     </div>
 
     <UModal
-      v-model:open="messageOpen"
-      title="Send tournament message"
-      description="Sends to the creator and all tournament admins via the backend mail queue."
+      v-model:open="confirmSaveOpen"
+      title="Confirm tournament update"
+      description="This will overwrite the tournament fields in the live database."
     >
       <template #content>
         <div class="space-y-4 p-5">
           <div>
             <h2 class="text-lg font-semibold text-graphite-50">
+              Confirm tournament update
+            </h2>
+            <p class="mt-1 text-sm text-graphite-400">
+              Update <span class="text-graphite-200">{{ form.name || `Tournament #${route.params.id}` }}</span>? This cannot be undone from here.
+            </p>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <UButton
+              color="neutral"
+              variant="ghost"
+              label="Cancel"
+              @click="confirmSaveOpen = false"
+            />
+            <UButton
+              color="primary"
+              label="Yes, save changes"
+              :loading="saving"
+              @click="save"
+            />
+          </div>
+        </div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="messageOpen"
+      title="Send tournament message"
+      description="Queued for 30 minutes so you can cancel or edit from Mail schedule."
+    >
+      <template #content>
+        <div class="max-h-[80vh] space-y-4 overflow-y-auto p-5">
+          <div>
+            <h2 class="text-lg font-semibold text-graphite-50">
               Send tournament message
             </h2>
             <p class="mt-1 text-sm text-graphite-400">
-              Sends to the creator and all tournament admins via the backend mail queue.
+              Schedules for {{ delayMinutes }} minutes. Edit recipients and copy below, then cancel from Mail schedule if needed.
             </p>
           </div>
 
@@ -413,30 +514,95 @@ async function sendMessage() {
               />
             </UFormField>
 
-            <p
-              v-if="activeTemplate && !isCustom"
-              class="rounded-md border border-white/8 bg-graphite-950/50 p-3 text-sm text-graphite-300"
-            >
-              {{ activeTemplate.preview }}
-            </p>
+            <UFormField label="Subject">
+              <UInput
+                v-model="messageSubject"
+                class="w-full"
+                maxlength="180"
+              />
+            </UFormField>
+            <UFormField label="Message">
+              <UTextarea
+                v-model="messageBody"
+                class="w-full"
+                :rows="8"
+                maxlength="5000"
+              />
+            </UFormField>
 
-            <template v-if="isCustom">
-              <UFormField label="Subject">
-                <UInput
-                  v-model="customSubject"
+            <div class="rounded-md border border-white/8 bg-graphite-950/40 p-3 space-y-3">
+              <p class="text-sm text-graphite-300">
+                Reply-to
+              </p>
+              <p class="text-xs text-graphite-500">
+                When recipients hit reply, this address gets the response. Useful when different operators own the thread.
+              </p>
+              <UFormField
+                v-if="replyToOptions.length"
+                label="Quick pick"
+              >
+                <USelect
+                  :model-value="replyToEmail"
+                  :items="replyToOptions.map(o => ({ label: `${o.name} · ${o.email} (${o.role})`, value: o.email }))"
                   class="w-full"
-                  maxlength="180"
+                  @update:model-value="(email: string) => {
+                    const opt = replyToOptions.find(o => o.email === email)
+                    replyToEmail = email
+                    replyToName = opt?.name || replyToName
+                  }"
                 />
               </UFormField>
-              <UFormField label="Message">
-                <UTextarea
-                  v-model="customBody"
-                  class="w-full"
-                  :rows="6"
-                  maxlength="5000"
-                />
-              </UFormField>
-            </template>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <UFormField label="Reply-to email">
+                  <UInput
+                    v-model="replyToEmail"
+                    type="email"
+                    class="w-full font-mono"
+                    placeholder="ops@example.com"
+                  />
+                </UFormField>
+                <UFormField label="Reply-to name">
+                  <UInput
+                    v-model="replyToName"
+                    class="w-full"
+                    placeholder="Ops desk"
+                  />
+                </UFormField>
+              </div>
+            </div>
+
+            <div>
+              <p class="mb-2 text-sm text-graphite-300">
+                Recipients
+              </p>
+              <ul class="space-y-2">
+                <li
+                  v-for="r in messageRecipients"
+                  :key="r.user_id"
+                  class="flex items-start gap-3 rounded-md border border-white/8 px-3 py-2"
+                >
+                  <UCheckbox
+                    :model-value="selectedRecipientIds.includes(r.user_id)"
+                    @update:model-value="(v: boolean | 'indeterminate') => toggleRecipient(r.user_id, v === true)"
+                  />
+                  <div class="min-w-0 text-sm">
+                    <p class="text-graphite-100">
+                      {{ r.name }}
+                      <span class="ml-2 font-mono text-[10px] uppercase tracking-wider text-graphite-500">{{ r.role }}</span>
+                    </p>
+                    <p class="truncate font-mono text-xs text-ops-300">
+                      {{ r.email }}
+                    </p>
+                  </div>
+                </li>
+              </ul>
+              <p
+                v-if="!messageRecipients.length"
+                class="text-sm text-graphite-500"
+              >
+                No creator/admin emails available.
+              </p>
+            </div>
 
             <div class="flex justify-end gap-2 pt-2">
               <UButton
@@ -447,10 +613,10 @@ async function sendMessage() {
               />
               <UButton
                 color="primary"
-                icon="i-lucide-send"
-                label="Send"
+                icon="i-lucide-clock"
+                label="Schedule send"
                 :loading="messageSending"
-                :disabled="isCustom && (!customSubject.trim() || !customBody.trim())"
+                :disabled="!messageSubject.trim() || !messageBody.trim() || !selectedRecipientIds.length"
                 @click="sendMessage"
               />
             </div>

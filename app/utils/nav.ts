@@ -59,6 +59,7 @@ export const adminNav: NavGroup[] = [
     label: 'Operations',
     items: [
       { label: 'Support', to: '/operations', icon: 'i-lucide-wrench' },
+      { label: 'Mail schedule', to: '/mail-schedule', icon: 'i-lucide-mail-clock' },
       { label: 'Audit log', to: '/audit', icon: 'i-lucide-scroll-text' }
     ]
   }
